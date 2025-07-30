@@ -1,0 +1,35 @@
+service: user-api-serverless-node
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: dev
+
+functions:
+  getUsers:
+    handler: src/index.getUsers
+    events:
+      - http:
+          path: users
+          method: get
+  createUser:
+    handler: src/index.createUser
+    events:
+      - http:
+          path: users
+          method: post
+  updateUser:
+    handler: src/index.updateUser
+    events:
+      - http:
+          path: users/{id}
+          method: put
+  deleteUser:
+    handler: src/index.deleteUser
+    events:
+      - http:
+          path: users/{id}
+          method: delete

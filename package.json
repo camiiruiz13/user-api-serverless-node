@@ -1,0 +1,18 @@
+{
+  "name": "user-api-serverless-node",
+  "version": "1.0.0",
+  "description": "API de usuarios desarrollada en Node.js utilizando el Serverless Framework",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "serverless": "^4.17.2"
+  },
+  "dependencies": {
+    "uuid": "^11.1.0"
+  }
+}
