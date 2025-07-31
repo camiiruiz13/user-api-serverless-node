@@ -51,6 +51,35 @@ class UserRoute {
     }
   }
 
+  async deleteUser(event) {
+    try { 
+      const userId = event.pathParameters.id;
+      userService.deleteUser(userId);
+      return {
+        statusCode: 200,
+        body: JSON.stringify(new SuccessResponse(MessagesResponse.USER_DELETED)),
+      };
+    } catch (error) {
+      return this.handlerError(error);
+    } 
+  } 
+
+  async getUserById(event) {
+    try {
+      const userId = event.pathParameters.id;
+      const user = userService.getUserById(userId);
+      if (!user) {
+        throw new Error(ExceptionMessages.USER_NOT_FOUND);
+      }
+      return {
+        statusCode: 200,
+        body: JSON.stringify(new SuccessResponse(MessagesResponse.USER_FOUND, user)),
+      };
+    } catch (error) {
+      return this.handlerError(error);
+    } 
+  }   
+
   handlerError(error) {
     console.error("Ha ocurrido un error:", error);
     const statusCode =
@@ -61,3 +90,4 @@ class UserRoute {
     };
   }
 }
+modulee.exports = UserRoute;

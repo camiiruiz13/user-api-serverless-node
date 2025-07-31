@@ -1,4 +1,4 @@
-service: user-api-serverless-node
+service: user-api-serverless-node 
 
 frameworkVersion: '3'
 
@@ -15,21 +15,31 @@ functions:
       - http:
           path: users
           method: get
+
   createUser:
     handler: src/index.createUser
     events:
       - http:
           path: users
           method: post
+
   updateUser:
     handler: src/index.updateUser
     events:
       - http:
           path: users/{id}
           method: put
+
   deleteUser:
     handler: src/index.deleteUser
     events:
       - http:
           path: users/{id}
           method: delete
+
+  getUserById:
+    handler: src/index.getUserById
+    events:
+      - http:
+          path: users/{id}
+          method: get
