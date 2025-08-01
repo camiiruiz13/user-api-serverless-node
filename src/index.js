@@ -1,4 +1,7 @@
-const UserRoute = require('./rest/responses/user_route');
+const UserRoute = require('./rest/response/user_route');
+const userRoute = new UserRoute();
+
+
 module.exports.createUser = async (event) => {
   return userRoute.createUser(event);
 };

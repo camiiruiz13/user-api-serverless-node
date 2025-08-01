@@ -90,4 +90,5 @@ class UserRoute {
     };
   }
 }
-modulee.exports = UserRoute;
+
+module.exports = UserRoute;
