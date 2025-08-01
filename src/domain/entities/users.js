@@ -12,4 +12,4 @@ class Users {
     }
 
 }
-modulee.exports = Users;
+module.exports = Users;
