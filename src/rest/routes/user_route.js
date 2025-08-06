@@ -1,11 +1,13 @@
 const UserService = require("../../domain/services/user_service");
+const DynamoUserAdapter = require("../../dynamodb/dynamo_user_adapter");
 const {
   SuccessResponse,
   ErrorResponse,
 } = require("../response/generic_response");
 const MessagesResponse = require("../../constants/response_messages");
 const ExceptionMessages = require("../../constants/exception_messages");
-const userService = new UserService();
+
+const userService = new UserService(new DynamoUserAdapter());
 
 class UserRoute {
   async createUser(event) {
