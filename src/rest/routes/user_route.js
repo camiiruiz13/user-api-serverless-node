@@ -1,5 +1,8 @@
 const UserService = require("../../domain/services/user_service");
 const UserRepository = require("../../dynamodb/dynamo_user_repository");
+const SendUserMessage = require("../../domain/services/send_user_message");
+const messageQueue = new SendUserMessage();
+
 const {
   SuccessResponse,
   ErrorResponse,
@@ -8,7 +11,7 @@ const MessagesResponse = require("../../constants/response_messages");
 const ExceptionMessages = require("../../constants/exception_messages");
 
 const userRepository = new UserRepository();
-const userService = new UserService(userRepository);
+const userService = new UserService(userRepository, messageQueue);
 
 class UserRoute {
   async createUser(event) {

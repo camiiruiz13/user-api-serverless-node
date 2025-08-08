@@ -8,6 +8,10 @@ provider:
   stage: dev
   environment:
     USER_TABLE: users
+    SQS_QUEUE_URL:
+      Ref: UserQueue
+    SNS_TOPIC_ARN:
+      Ref: EmailNotificationTopic
   iam:
     role:
       statements:
@@ -18,28 +22,44 @@ provider:
             - dynamodb:Scan
             - dynamodb:DeleteItem
             - dynamodb:UpdateItem
-          Resource: arn:aws:dynamodb:${self:provider.region}:*:table/users
+          Resource:
+            - arn:aws:dynamodb:${self:provider.region}:*:table/users
+
         - Effect: Allow
           Action:
-            - logs:CreateLogGroup
-            - logs:CreateLogStream
-            - logs:PutLogEvents
-          Resource: arn:aws:logs:${self:provider.region}:*:*
+            - sqs:SendMessage
+          Resource:
+            - Fn::GetAtt: [UserQueue, Arn]
+
+        - Effect: Allow
+          Action:
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource:
+            - Fn::GetAtt: [UserQueue, Arn]
+
+        - Effect: Allow
+          Action:
+            - sns:Publish
+          Resource:
+            - Ref: EmailNotificationTopic
 
 functions:
-  getUsers:
-    handler: src/index.getUsers
-    events:
-      - http:
-          path: users
-          method: get
-
+  # Lambda 1: crear usuario y enviar a SQS
   createUser:
     handler: src/index.createUser
     events:
       - http:
           path: users
           method: post
+
+  getUsers:
+    handler: src/index.getUsers
+    events:
+      - http:
+          path: users
+          method: get
 
   updateUser:
     handler: src/index.updateUser
@@ -62,8 +82,19 @@ functions:
           path: users/{id}
           method: get
 
+  # Lambda 2: escuchar desde SQS y enviar a SNS
+  sendEmail:
+    handler: src/index.sendEmail
+    events:
+      - sqs:
+          arn:
+            Fn::GetAtt:
+              - UserQueue
+              - Arn
+
 resources:
   Resources:
+
     UsersDynamoDBTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -75,3 +106,21 @@ resources:
           - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+
+    UserQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: user-queue
+
+    EmailNotificationTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: email-notification-topic
+
+    EmailNotificationSubscription:
+      Type: AWS::SNS::Subscription
+      Properties:
+        TopicArn:
+          Ref: EmailNotificationTopic
+        Protocol: email
+        Endpoint: crcamiruiz13@gmail.com    
