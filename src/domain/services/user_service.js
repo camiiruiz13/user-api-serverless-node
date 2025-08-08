@@ -17,7 +17,7 @@ class UserService {
       ...data,
     };
     const saveUser = await this.userRepository.saveUser(newUser);
-    await this.messageQueue.send(savedUser);
+    await this.messageQueue.send(saveUser);
     return saveUser;
   }
 
