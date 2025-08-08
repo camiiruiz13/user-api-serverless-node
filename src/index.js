@@ -1,12 +1,12 @@
 const UserRoute = require('./rest/routes/user_route');
-const userRoute = new UserRoute();
 
+const userRoute = new UserRoute();
 
 module.exports.createUser = async (event) => {
   return userRoute.createUser(event);
 };
 
-module.exports.getUsers= async (event) => {
+module.exports.getUsers = async (event) => {
   return userRoute.getUser(event);
 };
 
