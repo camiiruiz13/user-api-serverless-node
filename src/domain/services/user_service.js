@@ -2,8 +2,9 @@ const { v4: uuidv4 } = require("uuid");
 const ExceptionMessages = require("../../constants/exception_messages");
 
 class UserService {
-  constructor(userRepository) {
+  constructor(userRepository, messageQueue) {
     this.userRepository = userRepository;
+    this.messageQueue = messageQueue;
   }
 
   async getUsers() {
@@ -15,7 +16,9 @@ class UserService {
       id: uuidv4(),
       ...data,
     };
-    return await this.userRepository.saveUser(newUser);
+    const saveUser = await this.userRepository.saveUser(newUser);
+    await this.messageQueue.send(savedUser);
+    return saveUser;
   }
 
   async updateUser(id, data) {
