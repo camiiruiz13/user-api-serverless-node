@@ -1,5 +1,5 @@
 const UserService = require("../../domain/services/user_service");
-const DynamoUserAdapter = require("../../dynamodb/dynamo_user_adapter");
+const UserRepository = require("../../dynamodb/dynamo_user_repository");
 const {
   SuccessResponse,
   ErrorResponse,
@@ -7,13 +7,14 @@ const {
 const MessagesResponse = require("../../constants/response_messages");
 const ExceptionMessages = require("../../constants/exception_messages");
 
-const userService = new UserService(new DynamoUserAdapter());
+const userRepository = new UserRepository();
+const userService = new UserService(userRepository);
 
 class UserRoute {
   async createUser(event) {
     try {
       const data = JSON.parse(event.body);
-      const newUser = userService.createUser(data);
+      const newUser = await userService.createUser(data);
       return {
         statusCode: 201,
         body: JSON.stringify(
@@ -27,7 +28,7 @@ class UserRoute {
 
   async getUser(event) {
     try {
-      const data = userService.getUsers();
+      const data = await userService.getUsers();
       return {
         statusCode: 200,
         body: JSON.stringify(new SuccessResponse(MessagesResponse.USERS_LIST, data)),
@@ -41,7 +42,7 @@ class UserRoute {
     try {
       const userId = event.pathParameters.id;
       const data = JSON.parse(event.body);
-      const updatedUser = userService.updateUser(userId, data);
+      const updatedUser = await userService.updateUser(userId, data);
       return {
         statusCode: 200,
         body: JSON.stringify(
@@ -56,7 +57,7 @@ class UserRoute {
   async deleteUser(event) {
     try { 
       const userId = event.pathParameters.id;
-      userService.deleteUser(userId);
+      await userService.deleteUser(userId);
       return {
         statusCode: 200,
         body: JSON.stringify(new SuccessResponse(MessagesResponse.USER_DELETED)),
@@ -69,10 +70,7 @@ class UserRoute {
   async getUserById(event) {
     try {
       const userId = event.pathParameters.id;
-      const user = userService.getUserById(userId);
-      if (!user) {
-        throw new Error(ExceptionMessages.USER_NOT_FOUND);
-      }
+      const user = await userService.getUserById(userId);
       return {
         statusCode: 200,
         body: JSON.stringify(new SuccessResponse(MessagesResponse.USER_FOUND, user)),

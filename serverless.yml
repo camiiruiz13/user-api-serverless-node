@@ -1,5 +1,4 @@
 service: user-api-serverless-node
-
 frameworkVersion: '4'
 
 provider:
@@ -7,6 +6,8 @@ provider:
   runtime: nodejs18.x
   region: us-east-1
   stage: dev
+  environment:
+    USER_TABLE: users
   iam:
     role:
       statements:
@@ -18,7 +19,12 @@ provider:
             - dynamodb:DeleteItem
             - dynamodb:UpdateItem
           Resource: arn:aws:dynamodb:${self:provider.region}:*:table/users
-
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: arn:aws:logs:${self:provider.region}:*:*
 
 functions:
   getUsers:

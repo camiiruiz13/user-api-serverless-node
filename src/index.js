@@ -1,11 +1,6 @@
 const UserRoute = require('./rest/routes/user_route');
-const UserService = require('./domain/services/user_service');
-const DynamoUserAdapter = require('./dynamodb/dynamo_user_adapter');
 
-
-const userAdapter = new DynamoUserAdapter();
-const userService = new UserService(userAdapter);
-const userRoute = new UserRoute(userService);
+const userRoute = new UserRoute();
 
 module.exports.createUser = async (event) => {
   return userRoute.createUser(event);
