@@ -6,56 +6,26 @@ provider:
   runtime: nodejs18.x
   region: us-east-1
   stage: dev
+  profile: default
   environment:
     USER_TABLE: users
-    SQS_QUEUE_URL:
-      Ref: UserQueue
-    SNS_TOPIC_ARN:
-      Ref: EmailNotificationTopic
-  iam:
-    role:
-      statements:
-        - Effect: Allow
-          Action:
-            - dynamodb:PutItem
-            - dynamodb:GetItem
-            - dynamodb:Scan
-            - dynamodb:DeleteItem
-            - dynamodb:UpdateItem
-          Resource:
-            - arn:aws:dynamodb:${self:provider.region}:*:table/users
-
-        - Effect: Allow
-          Action:
-            - sqs:SendMessage
-          Resource:
-            - Fn::GetAtt: [UserQueue, Arn]
-
-        - Effect: Allow
-          Action:
-            - sqs:ReceiveMessage
-            - sqs:DeleteMessage
-            - sqs:GetQueueAttributes
-          Resource:
-            - Fn::GetAtt: [UserQueue, Arn]
-
-        - Effect: Allow
-          Action:
-            - sns:Publish
-          Resource:
-            - Ref: EmailNotificationTopic
+    SQS_QUEUE_URL: !Ref UserQueue
+    SNS_TOPIC_ARN: !Ref EmailNotificationTopic
 
 functions:
-  # Lambda 1: crear usuario y enviar a SQS
+  # 1) Lambda que crea usuario y envía a SQS (CA 1 y 2)
   createUser:
     handler: src/index.createUser
+    role: !GetAtt CreateUserLambdaRole.Arn
     events:
       - http:
           path: users
           method: post
 
+  # CRUD adicional (sin permisos a SQS ni SNS)
   getUsers:
     handler: src/index.getUsers
+    role: !GetAtt DefaultAppLambdaRole.Arn
     events:
       - http:
           path: users
@@ -63,6 +33,7 @@ functions:
 
   updateUser:
     handler: src/index.updateUser
+    role: !GetAtt DefaultAppLambdaRole.Arn
     events:
       - http:
           path: users/{id}
@@ -70,6 +41,7 @@ functions:
 
   deleteUser:
     handler: src/index.deleteUser
+    role: !GetAtt DefaultAppLambdaRole.Arn
     events:
       - http:
           path: users/{id}
@@ -77,24 +49,24 @@ functions:
 
   getUserById:
     handler: src/index.getUserById
+    role: !GetAtt DefaultAppLambdaRole.Arn
     events:
       - http:
           path: users/{id}
           method: get
 
-  # Lambda 2: escuchar desde SQS y enviar a SNS
+  # 3) Lambda que consume SQS y publica en SNS (CA 3)
   sendEmail:
     handler: src/index.sendEmail
+    role: !GetAtt SendEmailLambdaRole.Arn
     events:
       - sqs:
-          arn:
-            Fn::GetAtt:
-              - UserQueue
-              - Arn
+          arn: !GetAtt UserQueue.Arn
 
 resources:
   Resources:
 
+    # ---------- Datos ----------
     UsersDynamoDBTable:
       Type: AWS::DynamoDB::Table
       Properties:
@@ -107,6 +79,7 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
 
+    # ---------- Mensajería ----------
     UserQueue:
       Type: AWS::SQS::Queue
       Properties:
@@ -117,10 +90,170 @@ resources:
       Properties:
         TopicName: email-notification-topic
 
+    # (opcional) suscripción de prueba
     EmailNotificationSubscription:
       Type: AWS::SNS::Subscription
       Properties:
-        TopicArn:
-          Ref: EmailNotificationTopic
+        TopicArn: !Ref EmailNotificationTopic
         Protocol: email
-        Endpoint: crcamiruiz13@gmail.com    
+        Endpoint: crcamiruiz13@gmail.com
+
+    # ---------- Roles IAM por función ----------
+    # Rol genérico para lambdas CRUD que NO deben tocar SQS/SNS (CA 4 y 5)
+    DefaultAppLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: !Sub ${self:service}-${self:provider.stage}-default-app-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal: { Service: lambda.amazonaws.com }
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: logs-basic
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: arn:aws:logs:*:*:*
+          - PolicyName: dynamodb-read
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - dynamodb:DescribeTable
+                    - dynamodb:CreateTable
+                    - dynamodb:PutItem
+                    - dynamodb:GetItem
+                    - dynamodb:Scan
+                    - dynamodb:UpdateItem
+                    - dynamodb:DeleteItem
+                  Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users
+
+    # Rol SOLO para createUser: DynamoDB + SendMessage a SQS (CA 1,2,4,5)
+    CreateUserLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: !Sub ${self:service}-${self:provider.stage}-create-user-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal: { Service: lambda.amazonaws.com }
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: logs-basic
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: arn:aws:logs:*:*:*
+          - PolicyName: dynamodb-write-users
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - dynamodb:PutItem
+                    - dynamodb:GetItem
+                    - dynamodb:UpdateItem
+                  Resource: !Sub arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/users
+          - PolicyName: sqs-send-userqueue
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: sqs:SendMessage
+                  Resource: !GetAtt UserQueue.Arn
+
+    # Rol SOLO para sendEmail: consumir SQS y publicar en SNS (CA 3,4,5)
+    SendEmailLambdaRole:
+      Type: AWS::IAM::Role
+      Properties:
+        RoleName: !Sub ${self:service}-${self:provider.stage}-send-email-role
+        AssumeRolePolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Effect: Allow
+              Principal: { Service: lambda.amazonaws.com }
+              Action: sts:AssumeRole
+        Policies:
+          - PolicyName: logs-basic
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - logs:CreateLogGroup
+                    - logs:CreateLogStream
+                    - logs:PutLogEvents
+                  Resource: arn:aws:logs:*:*:*
+          - PolicyName: sqs-consume-userqueue
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action:
+                    - sqs:ReceiveMessage
+                    - sqs:DeleteMessage
+                    - sqs:GetQueueAttributes
+                  Resource: !GetAtt UserQueue.Arn
+          - PolicyName: sns-publish-emailtopic
+            PolicyDocument:
+              Version: '2012-10-17'
+              Statement:
+                - Effect: Allow
+                  Action: sns:Publish
+                  Resource: !Ref EmailNotificationTopic
+
+    # ---------- Políticas de recurso (refuerzo de CA 4/5) ----------
+    # Restringe el uso de la cola a estos dos roles
+    UserQueuePolicy:
+      Type: AWS::SQS::QueuePolicy
+      Properties:
+        Queues: [ !Ref UserQueue ]
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: AllowAccessFromSpecificRoles
+              Effect: Allow
+              Principal:
+                AWS:
+                  - !GetAtt CreateUserLambdaRole.Arn
+                  - !GetAtt SendEmailLambdaRole.Arn
+              Action:
+                - sqs:SendMessage
+                - sqs:ReceiveMessage
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+              Resource: !GetAtt UserQueue.Arn
+
+    # Restringe Publish del topic al rol de sendEmail
+    EmailNotificationTopicPolicy:
+      Type: AWS::SNS::TopicPolicy
+      Properties:
+        Topics: [ !Ref EmailNotificationTopic ]
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: AllowPublishFromSendEmailRole
+              Effect: Allow
+              Principal:
+                AWS: !GetAtt SendEmailLambdaRole.Arn
+              Action: sns:Publish
+              Resource: !Ref EmailNotificationTopic
+
+  Outputs:
+    EmailNotificationTopicArn:
+      Value: !Ref EmailNotificationTopic
+      Description: ARN del topic SNS para ser consumido por otros stacks
